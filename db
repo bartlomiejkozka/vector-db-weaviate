@@ -3,4 +3,12 @@
 # Runs the specified query against the Weaviate database.
 set -e
 
-exec python -m src.cli "$@"
+cd "$(dirname "$0")"
+
+if [ -x .venv/bin/python ]; then
+    PYTHON=.venv/bin/python
+else
+    PYTHON=python3
+fi
+
+exec "$PYTHON" -m src.cli "$@"

@@ -26,20 +26,5 @@ services:
       timeout: 3s
       retries: 10
 
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    depends_on:
-      weaviate:
-        condition: service_healthy
-    environment:
-      WEAVIATE_URL: http://weaviate:8080
-      WEAVIATE_GRPC_URL: weaviate:50051
-    volumes:
-    - app_data:/app/data
-    command: ["tail", "-f", "/dev/null"]
-
 volumes:
   weaviate_data:
-  app_data:

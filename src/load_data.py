@@ -72,14 +72,15 @@ def load_data():
             print(f"Deleting existing collection '{COLLECTION_NAME}'...")
             client.collections.delete(COLLECTION_NAME)
         
-        # Create collection
+        # Create collection using modern Weaviate v4 API
         from weaviate.classes.config import Configure, Property, DataType
         
         collection = client.collections.create(
             name=COLLECTION_NAME,
-            vectorizer_config=Configure.Vectorizer.none(),
-            vector_index_config=Configure.VectorIndex.hnsw(
-                distance_metric=weaviate.classes.config.VectorDistances.COSINE,
+            vector_config=Configure.Vectors.self_provided(
+                vector_index_config=Configure.VectorIndex.hnsw(
+                    distance_metric=weaviate.classes.config.VectorDistances.COSINE,
+                ),
             ),
             properties=[
                 Property(name="vector_id", data_type=DataType.INT),
@@ -91,9 +92,8 @@ def load_data():
         # Import train vectors
         print(f"Importing {len(train_vectors)} train vectors...")
         start_time = time.time()
-
-        # Client-side batching!!! (consider change to Server-side batching as more efficient and stable?)
-        with collection.batch.fixed_size(batch_size=1000) as batch: 
+        
+        with collection.batch.fixed_size(batch_size=1000) as batch:
             for i, vector in enumerate(train_vectors):
                 batch.add_object(
                     properties={"vector_id": i, "split": "train"},
@@ -104,14 +104,17 @@ def load_data():
                     rate = (i + 1) / elapsed
                     print(f"  Imported {i + 1}/{len(train_vectors)} train vectors ({rate:.0f} vec/s)")
         
+        if len(collection.batch.failed_objects) > 0:
+            print(f"Warning: {len(collection.batch.failed_objects)} train objects failed to import!", file=sys.stderr)
+            print(f"Sample error: {collection.batch.failed_objects[0].message}", file=sys.stderr)
+        
         train_time = time.time() - start_time
         print(f"Train vectors imported in {train_time:.1f}s")
         
         # Import test vectors
         print(f"Importing {len(test_vectors)} test vectors...")
         test_start = time.time()
-
-        # Client-side batching!!! (consider change to Server-side batching as more efficient and stable?)
+        
         with collection.batch.fixed_size(batch_size=1000) as batch:
             for i, vector in enumerate(test_vectors):
                 batch.add_object(
@@ -119,9 +122,7 @@ def load_data():
                     vector=vector.tolist(),
                 )
                 if (i + 1) % 5000 == 0:
-                    elapsed = time.time() - test_start
-                    rate = (i + 1) / elapsed
-                    print(f"  Imported {i + 1}/{len(test_vectors)} test vectors ({rate:.0f} vec/s)")
+                    print(f"  Imported {i + 1}/{len(test_vectors)} test vectors")
         
         test_time = time.time() - test_start
         total_time = time.time() - start_time

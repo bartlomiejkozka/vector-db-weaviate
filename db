@@ -1,6 +1,16 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Usage: ./db <query_number> [param1] [param2] ...
 # Runs the specified query against the Weaviate database.
 set -e
 
-exec python -m src.cli "$@"
+# If running inside container
+if [ "$IN_DOCKER" = "true" ] || [ -f /.dockerenv ] || [ -f /run/.containerenv ]; then
+    exec python -m src.cli "$@"
+else
+    # Running on host: delegate execution to the running app container
+    if [ -t 0 ]; then
+        exec docker compose exec app ./db "$@"
+    else
+        exec docker compose exec -T app ./db "$@"
+    fi
+fi

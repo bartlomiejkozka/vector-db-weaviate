@@ -14,7 +14,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Make the db script executable
-RUN chmod +x /app/db
+# Set container environment flag and add /app to PATH
+ENV IN_DOCKER=true \
+    PATH="/app:${PATH}"
+
+# Ensure LF line endings and executable permissions for the db script
+RUN sed -i 's/\r$//' /app/db && chmod +x /app/db
 
 CMD ["tail", "-f", "/dev/null"]

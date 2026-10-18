@@ -19,11 +19,11 @@ The project consists of two Docker containers managed by Docker Compose:
 │            Docker Compose               │
 │                                         │
 │  ┌─────────────┐    ┌───────────────┐   │
-│  │   app        │    │   weaviate    │   │
-│  │  (Python)    │───▶│  (Database)   │   │
+│  │   app       │    │   weaviate    │   │
+│  │  (Python)   │───▶│  (Database)   │   │
 │  │             │REST│   port 8080   │   │
 │  │  - CLI (db) │gRPC│   port 50051  │   │
-│  │  - Loader   │    │              │   │
+│  │  - Loader   │    │               │   │
 │  └─────────────┘    └───────────────┘   │
 │                                         │
 │  Volume: weaviate_data (persistent)     │
@@ -31,56 +31,65 @@ The project consists of two Docker containers managed by Docker Compose:
 └─────────────────────────────────────────┘
 ```
 
-- **app**: Python container with the CLI tool and data loader
+- **app**: Python container containing the CLI tool and data loader
 - **weaviate**: Vector database instance with HNSW index
 - Communication: REST API (port 8080) + gRPC (port 50051)
 
 ## 3. Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) (with Docker Compose v2)
-- `make` (optional, for convenience commands)
-- ~3 GB disk space for the dataset
+- ~3 GB disk space for the dataset and index
 - Internet connection (for initial dataset download)
 
 ## 4. Installation and Setup
 
+Setup is completely handled by Docker without requiring any local dependencies or build tools:
+
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone <repo-url>
 cd project
 
-# Build and start everything
-make setup
+# 2. Build and start all containers in the background
+docker compose up -d --build
 
-# Download and load the dataset into Weaviate
-make load
-```
-
-Alternatively, without `make`:
-```bash
-docker compose build
-docker compose up -d
+# 3. Download the dataset and import it into Weaviate (one-time setup)
 docker compose exec app python -m src.load_data
+
+# 4. Enter the interactive CLI container
+docker compose exec -it app bash
 ```
+
+Once inside the container shell, `/app` is on `$PATH`, so you can immediately execute queries directly:
+```bash
+db 1 100 5
+```
+
+> [!TIP]
+> If you prefer to stay in your host terminal without entering the container shell:
+> - **Linux / macOS / Git Bash**: run `export PATH="$PWD:$PATH"` once in your terminal session, then run `db 1 100 5` (or `./db 1 100 5`).
+> - **Windows (PowerShell)**: run `$env:PATH = "$PWD;$env:PATH"` once in your PowerShell session, then run `db 1 100 5` (or `./db 1 100 5`).
+> - **Any OS (Docker Compose direct)**: `docker compose exec app ./db 1 100 5`
 
 ## 5. Design and Implementation
 
 ### Data Pipeline
-1. `src/load_data.py` downloads the HDF5 dataset from HuggingFace
-2. Vectors are batch-imported into Weaviate with HNSW indexing
-3. Ground truth (neighbors + distances) is saved locally for recall evaluation
+1. `src/load_data.py` downloads the HDF5 dataset from HuggingFace directly into the shared Docker volume (`app_data`).
+2. Vectors are batch-imported into Weaviate with HNSW indexing.
+3. Ground truth (exact nearest neighbors + distances) is saved locally for recall evaluation.
 
 ### Collection Schema
 - **Collection**: `Landmark`
-- **Vectorizer**: none (pre-computed embeddings)
+- **Vectorizer**: `none` (pre-computed embeddings)
 - **Index**: HNSW with cosine distance
 - **Properties**: `vector_id` (int), `split` (text: train/test)
 
-### CLI Tool
-The `db` script dispatches queries by number:
-```
+### CLI Tool (`db`)
+The CLI tool allows running queries by number and accepts arbitrary parameters:
+```bash
 db <query_number> [param1] [param2] ...
 ```
+
 
 ## 6. Goals / Queries
 
@@ -90,12 +99,14 @@ db <query_number> [param1] [param2] ...
 | 2 | K-Means | TBD | TBD |
 
 ### Query 1: KNN
-Finds the K nearest neighbors of a given test vector using Weaviate's `nearVector` search.
-Compares results with ground truth and reports recall@K.
+Finds the $K$ nearest neighbors of a given test vector using Weaviate's `nearVector` search.
+Compares results against the dataset's precomputed ground truth and reports `recall@K`.
 
 ```bash
-make query Q="1 100 5"    # KNN: test vector #100, k=5
-# or directly:
+# Example: Find 5 nearest neighbors for test vector #100
+db 1 100 5
+
+# Or via Docker Compose directly:
 docker compose exec app ./db 1 100 5
 ```
 
@@ -114,29 +125,35 @@ docker compose exec app ./db 1 100 5
 
 ### Quick Start
 ```bash
-make setup     # Build and start containers
-make load      # Download and import dataset (~760K vectors)
-make query Q="1 0 10"  # Run KNN: find 10 nearest neighbors of test vector #0
+# 1. Build and start containers
+docker compose up -d --build
+
+# 2. Download and import dataset (~760K vectors)
+docker compose exec app python -m src.load_data
+
+# 3. Enter the CLI shell
+docker compose exec -it app bash
+
+# 4. Run queries directly
+db 1 0 10
 ```
 
-### All Commands
-```bash
-make help      # Show available commands
-make setup     # Build and start all containers
-make up        # Start containers
-make down      # Stop containers
-make load      # Download dataset and import into Weaviate
-make query Q="1 100 5"  # Run a query
-make status    # Show container status
-make logs      # Show container logs
-make clean     # Stop containers, remove volumes and data
-make reset     # Full reset: clean + rebuild
-```
+### Command Reference
+
+| Task | Command |
+|---|---|
+| **Build & start services** | `docker compose up -d --build` |
+| **Stop services** | `docker compose down` |
+| **Download & load dataset** | `docker compose exec app python -m src.load_data` |
+| **Run query** | `db 1 <vector_id> <k>` (or `docker compose exec app ./db 1 <vector_id> <k>`) |
+| **Container status** | `docker compose ps` |
+| **View logs** | `docker compose logs -f` |
+| **Full clean / reset** | `docker compose down -v` |
 
 ### Reproducing Results
-1. `make setup` — builds containers
-2. `make load` — downloads and imports dataset
-3. Run specific queries as documented in section 6
+1. Run `docker compose up -d --build` to spin up Weaviate and the application container.
+2. Run `docker compose exec app python -m src.load_data` to import the benchmark dataset and extract ground truth.
+3. Run the evaluation queries as documented in Section 6 (e.g. `db 1 100 5`).
 
 ## 10. Self-Evaluation
 

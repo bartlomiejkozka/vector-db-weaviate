@@ -36,6 +36,7 @@ services:
     environment:
       WEAVIATE_URL: http://weaviate:8080
       WEAVIATE_GRPC_URL: weaviate:50051
+      IN_DOCKER: "true"
     volumes:
     - app_data:/app/data
     command: ["tail", "-f", "/dev/null"]

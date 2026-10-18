@@ -1,0 +1,6 @@
+#!/bin/bash
+# Usage: ./db <query_number> [param1] [param2] ...
+# Runs the specified query against the Weaviate database.
+set -e
+
+exec python -m src.cli "$@"

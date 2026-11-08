@@ -1,0 +1,59 @@
+# Registry of the VIBE datasets listed in the Common Baseline.
+#
+# The registry is used for downloading (url, size, checksum) and for showing the
+# resolved configuration before a file is downloaded. Once the file exists, the
+# real row count, dimension, distance and point_type are always read from the
+# HDF5 attributes and compared with the values below.
+#
+# sha256 = the LFS object id published by Hugging Face (x-linked-etag), which is
+# the sha256 of the file. Sizes are in bytes.
+
+base_url = "https://huggingface.co/datasets/vector-index-bench/vibe/resolve/main"
+
+[datasets."glove-200-cosine"]
+rows = 1192514
+dim = 200
+distance = "cosine"
+bytes = 956427392
+sha256 = "5c0c316db8dd6c2503ea842ba8dc698d1513aa89a6655cc0d4be35d47645f5e0"
+baseline = "accept"
+
+[datasets."landmark-nomic-768-normalized"]
+rows = 760757
+dim = 768
+distance = "normalized"        # "any" in the baseline table -> cosine
+bytes = 2341733696
+sha256 = "9e870c21f3a33cea1adb9055ce0e7af0988557b5e4e21485a661f40365be286a"
+baseline = "accept"
+
+[datasets."arxiv-nomic-768-normalized"]
+rows = 1344643
+dim = 768
+distance = "normalized"
+bytes = 4135431488
+sha256 = "8be0993b978b0d0ef023d21d878251a5ed09e058adb25994553c08388d37d414"
+baseline = "accept"            # "tight for HNSW"
+
+[datasets."hotpotqa-harrier-640-normalized"]
+rows = 5233329
+dim = 640
+distance = "normalized"
+bytes = 13688159632
+sha256 = "08f1c68cc8bb1f24a29cb64d9ffc20ccc6a91c06d286538e4e659d4afb648114"
+baseline = "reject"            # raw 13.4 GB, does not fit the 8 GB container
+
+[datasets."celeba-resnet-2048-cosine"]
+rows = 201599
+dim = 2048
+distance = "cosine"
+bytes = 1661307200
+sha256 = "168f89ccf8aaa22cc9ce6f81c241fd016eb67a0bc5b5b381b955ffa746a906f4"
+baseline = "accept"            # deprecated in VIBE, file still available
+
+[datasets."inaturalist-resnet-2048-cosine"]
+rows = 499000
+dim = 2048
+distance = "cosine"
+bytes = 4097616192
+sha256 = "1b0b15a015cce322fd9e0a05e153dfca274490881257c7483276a29d6d83a369"
+baseline = "accept"            # "tight for HNSW"

@@ -1,6 +1,13 @@
+# Datasets and database files are never committed (Common Baseline)
 data/
+db-data/
+*.hdf5
+*.hdf5.part
+results/runs/*.state.json
+
 __pycache__/
 *.pyc
 .env
 .venv/
 *.pdf
+.DS_Store

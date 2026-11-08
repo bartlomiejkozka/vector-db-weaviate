@@ -1,14 +1,13 @@
-#!/bin/bash
-# Usage: ./db <query_number> [param1] [param2] ...
-# Runs the specified query against the Weaviate database.
-set -e
-
-cd "$(dirname "$0")"
-
-if [ -x .venv/bin/python ]; then
-    PYTHON=.venv/bin/python
+#!/bin/sh
+# db <goal> <params...>   e.g. db 1 443321 4
+# Works in the client container (PYTHONPATH=/app/src) and locally from the repository root.
+here="$(cd "$(dirname "$0")" && pwd)"
+if [ -d "$here/src/wvbench" ]; then
+    PYTHONPATH="$here/src${PYTHONPATH:+:$PYTHONPATH}"
+    export PYTHONPATH
+    PY="$here/.venv/bin/python"
+    [ -x "$PY" ] || PY=python3
 else
-    PYTHON=python3
+    PY=python
 fi
-
-exec "$PYTHON" -m src.cli "$@"
+exec "$PY" -m wvbench.cli "$@"

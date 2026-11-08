@@ -1,4 +1,6 @@
-weaviate-client>=4.23.0
-h5py>=3.10.0
-numpy>=1.26.0
-requests>=2.31.0
+# Client container dependencies, pinned (Common Baseline: versions pinned in the repo).
+weaviate-client==4.23.1
+h5py==3.16.0
+numpy==2.5.4
+requests==2.34.2
+docker==7.1.0

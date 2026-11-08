@@ -1,0 +1,7 @@
+.git
+.venv
+data
+results
+*.hdf5
+*.pdf
+**/__pycache__

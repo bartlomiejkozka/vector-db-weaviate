@@ -1,30 +1,88 @@
+# Weaviate under the Common Baseline limits + benchmark client.
+#
+#   docker compose build
+#   docker compose up -d weaviate
+#   docker compose run --rm download glove-200-cosine
+#   docker compose run --rm setup glove-200-cosine          # schema -> load -> index -> check -> build.csv
+#   docker compose run --rm benchmark db 1 443321 4
+#
+# Local settings (CPU pinning, memory, timing mode, dataset) go to .env, see .env.example.
+
+x-client: &client
+  build: .
+  image: wvbench-client:latest
+  cpuset: "${CLIENT_CPUS:-4}"            # the client gets its own core
+  depends_on:
+    weaviate:
+      condition: service_healthy
+  environment:
+    WEAVIATE_HOST: weaviate
+    WEAVIATE_HTTP_PORT: "8080"
+    WEAVIATE_GRPC_PORT: "50051"
+    WEAVIATE_METRICS_PORT: "2112"
+    WEAVIATE_CONTAINER: "${WEAVIATE_CONTAINER:-wvbench-weaviate}"
+    WEAVIATE_CPUS: "${WEAVIATE_CPUS:-0-3}"
+    WEAVIATE_MEM_LIMIT: "${WEAVIATE_MEM_LIMIT:-8g}"
+    ASYNC_INDEXING: "${ASYNC_INDEXING:-true}"
+    WVB_DATASET: "${WVB_DATASET:-}"
+    WVB_PROFILE: "${WVB_PROFILE:-}"
+    WVB_PARAMS: "${WVB_PARAMS:-}"
+    HOST_CPU_MODEL: "${HOST_CPU_MODEL:-}"
+    HOST_OS: "${HOST_OS:-}"
+    HOST_RAM_GB: "${HOST_RAM_GB:-}"
+    HOST_DISK_TYPE: "${HOST_DISK_TYPE:-SSD}"
+  volumes:
+    - ./data:/data:ro                     # read-only except in the download step
+    - weaviate_db:/db:ro                  # to measure index / database size on disk
+    - ./results:/results
+    - ./config:/app/config:ro             # config changes apply without a rebuild
+    - ./src:/app/src:ro
+    - ./scripts:/app/scripts:ro
+    - /var/run/docker.sock:/var/run/docker.sock   # container memory.peak + restart before load
+
 services:
   weaviate:
-    command:
-    - --host
-    - 0.0.0.0
-    - --port
-    - '8080'
-    - --scheme
-    - http
     image: cr.weaviate.io/semitechnologies/weaviate:1.40.1
-    ports:
-    - 8080:8080
-    - 50051:50051
-    volumes:
-    - weaviate_data:/var/lib/weaviate
-    restart: on-failure:0
+    container_name: "${WEAVIATE_CONTAINER:-wvbench-weaviate}"
+    command: ["--host", "0.0.0.0", "--port", "8080", "--scheme", "http"]
+    cpuset: "${WEAVIATE_CPUS:-0-3}"       # 4 pinned cores
+    mem_limit: "${WEAVIATE_MEM_LIMIT:-8g}"
+    memswap_limit: "${WEAVIATE_MEM_LIMIT:-8g}"   # = mem_limit -> swap off
+    env_file: config/weaviate.env
     environment:
-      QUERY_DEFAULTS_LIMIT: 25
-      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
-      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
-      DEFAULT_VECTORIZER_MODULE: 'none'
-      CLUSTER_HOSTNAME: 'node1'
+      GOMAXPROCS: "${WEAVIATE_GOMAXPROCS:-4}"
+      GOMEMLIMIT: "${WEAVIATE_GOMEMLIMIT:-6800MiB}"
+      ASYNC_INDEXING: "${ASYNC_INDEXING:-true}"
+    volumes:
+      - weaviate_db:/db
+    ports:
+      - "127.0.0.1:${WEAVIATE_HTTP_PORT:-8080}:8080"
+      - "127.0.0.1:${WEAVIATE_GRPC_PORT:-50051}:50051"
+      - "127.0.0.1:${WEAVIATE_METRICS_PORT:-2112}:2112"
+    restart: "no"
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/v1/.well-known/ready"]
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 30
+
+  download:
+    <<: *client
+    depends_on: []
+    volumes:
+      - ./data:/data                      # the only step that writes to /data
+      - ./config:/app/config:ro
+      - ./src:/app/src:ro
+      - ./scripts:/app/scripts:ro
+    entrypoint: ["python", "scripts/download.py"]
+
+  setup:
+    <<: *client
+    entrypoint: ["python", "scripts/build.py"]
+
+  benchmark:
+    <<: *client
+    command: ["db", "--help"]
 
 volumes:
-  weaviate_data:
+  weaviate_db:

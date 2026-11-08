@@ -1,0 +1,202 @@
+# Weaviate collection / index configuration.
+#
+# How the final configuration of a run is resolved (later wins):
+#   1. [defaults]                       - common index parameters
+#   2. [profiles.<name>]                - chosen automatically by [[selection.rules]]
+#                                         or manually (--profile / WVB_PROFILE /
+#                                         `profile = "..."` in [overrides.<dataset>])
+#   3. [overrides."<dataset>"]          - per-dataset tuning
+#   4. WVB_PARAMS="k=v,k=v"             - environment variable
+#   5. --param k=v (repeatable)         - command line
+#
+# Keys without a dot are index parameters (e.g. max_connections=32).
+# Keys with a dot address the other sections (e.g. ingest.mode=server_side).
+#
+# Print the resolved configuration without touching the database:
+#   docker compose run --rm benchmark python scripts/show_config.py <dataset>
+#
+# Sizes are decimal GB (1 GB = 1e9 bytes), as in the Common Baseline tables.
+
+# ---------------------------------------------------------------------------
+# Memory estimator: decides whether a configuration fits the container.
+# ---------------------------------------------------------------------------
+[estimator]
+mode = "detailed"           # "simple" | "detailed"
+memory_limit_gb = 8.0       # container RAM limit (keep in sync with WEAVIATE_MEM_LIMIT)
+# simple:   vector_bytes * simple_factor <= memory_limit
+#           (with no quantization and a full vector cache this is exactly the
+#            baseline rule "raw size x 1.5 <= container RAM")
+simple_factor = 1.5
+# detailed: (vector_bytes + graph_bytes) * overhead_factor <= memory_limit * budget_fraction
+#           graph_bytes = rows * 2 * max_connections * bytes_per_link  (HNSW layer 0)
+bytes_per_link = 10         # Weaviate docs: ~8-10 B per connection; raise to 20 to be conservative
+overhead_factor = 1.25      # GC, copies, allocator
+budget_fraction = 0.85      # ~ GOMEMLIMIT / container limit
+
+# ---------------------------------------------------------------------------
+# Automatic profile selection: first matching rule wins.
+# Conditions (all optional): min_raw_gb, max_raw_gb, min_dim, max_dim, min_rows, max_rows
+# raw_gb = rows * dim * 4 / 1e9
+# ---------------------------------------------------------------------------
+[[selection.rules]]
+profile = "small"
+max_raw_gb = 1.5
+
+[[selection.rules]]
+profile = "medium"
+max_raw_gb = 3.0
+
+[[selection.rules]]
+profile = "large"
+max_raw_gb = 5.34           # 8 GB / 1.5, the last size the baseline accepts
+
+# What to do when no rule matches or the estimate exceeds the memory budget.
+[oversize]
+policy = "reject"           # "reject" (default) | "fallback"
+fallback = "hnsw_rq8"       # used when policy = "fallback": hnsw_rq8 | hnsw_rq4 | hnsw_pq | hnsw_bq | hnsw_sq | hfresh | flat
+
+# ---------------------------------------------------------------------------
+# Index parameters shared by every profile (each one can be overridden).
+# ---------------------------------------------------------------------------
+[defaults]
+index = "hnsw"                          # hnsw | flat | hfresh
+distance = "auto"                       # auto = from the file ("normalized"/"any" -> cosine)
+quantizer = "none"                      # none | rq | pq | bq | sq
+vector_cache_max_objects = 1000000000000  # Weaviate default (1e12) = everything in RAM;
+                                          # a value below the row count keeps part of the vectors on disk
+# HNSW
+max_connections = 32                    # immutable after creation
+ef_construction = 128                   # immutable after creation
+ef = -1                                 # -1 = dynamic ef; the benchmark sets explicit values (mutable)
+dynamic_ef_min = 100
+dynamic_ef_max = 500
+dynamic_ef_factor = 8
+flat_search_cutoff = 40000              # only relevant with filters (we have none)
+cleanup_interval_seconds = 300
+# Quantizer parameters (used only when quantizer != "none")
+rq_bits = 8                             # 8 | 4 | 1
+rescore_limit = -1                      # -1 = Weaviate default for the chosen quantizer
+pq_segments = 0                         # 0 = auto (dim / 8, as in the baseline IVF-PQ estimate)
+pq_centroids = 256
+training_limit = 100000
+# HFresh
+max_posting_size_kb = 48
+replicas = 4
+search_probe = 256
+# Search sweep used by the benchmark (milestone 2): parameter name and values.
+sweep_param = "ef"
+sweep_values = [16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512]
+
+# ---------------------------------------------------------------------------
+# Profiles. Starting values, to be tuned empirically.
+# ---------------------------------------------------------------------------
+[profiles.small]                # raw <= 1.5 GB (glove-200)
+max_connections = 48
+ef_construction = 256
+
+[profiles.medium]               # raw <= 3 GB (celeba-2048, landmark-768)
+max_connections = 32
+ef_construction = 192
+
+[profiles.large]                # raw <= 5.34 GB (arxiv-768, inaturalist-2048)
+max_connections = 24
+ef_construction = 128
+
+# --- Fallbacks / extra experiments (not selected automatically) -------------
+[profiles.hnsw_rq8]             # 4x smaller vectors in RAM, full vectors stay on disk
+max_connections = 16
+ef_construction = 128
+quantizer = "rq"
+rq_bits = 8
+
+[profiles.hnsw_rq4]             # 8x
+max_connections = 16
+ef_construction = 128
+quantizer = "rq"
+rq_bits = 4
+
+[profiles.hnsw_pq]
+max_connections = 16
+ef_construction = 128
+quantizer = "pq"
+
+[profiles.hnsw_bq]              # 32x, low recall without rescoring
+max_connections = 16
+ef_construction = 128
+quantizer = "bq"
+
+[profiles.hnsw_sq]              # 4x
+max_connections = 16
+ef_construction = 128
+quantizer = "sq"
+
+[profiles.hfresh]               # cluster/posting-list index (SPFresh), RQ 1-bit is mandatory
+index = "hfresh"
+quantizer = "rq"
+rq_bits = 1
+sweep_param = "search_probe"
+sweep_values = [16, 32, 64, 128, 256, 512, 1024]
+
+[profiles.flat]                 # no index: exact search, baseline
+index = "flat"
+sweep_param = "none"
+sweep_values = []
+
+# ---------------------------------------------------------------------------
+# Per-dataset overrides (examples, uncomment to use).
+# ---------------------------------------------------------------------------
+# [overrides."glove-200-cosine"]
+# profile = "medium"            # pin a profile instead of the automatic choice
+# ef_construction = 384
+# "ingest.batch_size" = 2000
+
+# ---------------------------------------------------------------------------
+# Collection layout
+# ---------------------------------------------------------------------------
+[schema]
+store_row_id = true             # true: keep the baseline "id" column as INT property `row_id`
+                                # false: rely only on the object UUID (UUID(int=row))
+row_id_filterable = false       # inverted index on row_id; glove: +448 MB on disk. Not needed:
+                                # objects are fetched by UUID, queries return no properties
+vector_name = "vector"          # name of the (single, self-provided) named vector
+
+# ---------------------------------------------------------------------------
+# Loading
+# ---------------------------------------------------------------------------
+[ingest]
+mode = "client_fixed"           # client_fixed | client_dynamic | server_side
+read_chunk = 50000              # rows read from the HDF5 file at once (baseline: ~50,000)
+batch_size = 1000               # client_fixed: objects per request
+concurrent_requests = 2         # client_fixed: parallel requests
+stream_concurrency = 1          # server_side: parallel streams (server decides the batch size)
+max_errors = 0                  # abort the load when more objects fail
+
+# ---------------------------------------------------------------------------
+# Timing of load / index build
+# ---------------------------------------------------------------------------
+[timing]
+# auto  = follow ASYNC_INDEXING of the server (set in .env, shared by both containers)
+# async = ingest_s until the last object is stored, build_s until the index queue is empty
+#         (requires ASYNC_INDEXING=true; graph building already starts during loading)
+# sync  = baseline DDL exception: ingest_s = load + index, build_s empty
+#         (requires ASYNC_INDEXING=false)
+mode = "auto"
+poll_interval_s = 1.0
+index_timeout_s = 0             # 0 = no timeout
+
+# ---------------------------------------------------------------------------
+# Measurements
+# ---------------------------------------------------------------------------
+[metrics]
+memory_source = "cgroup"        # cgroup (container memory.peak via Docker) | prometheus | off
+restart_before_load = true      # restart Weaviate before loading so memory.peak starts from zero
+prometheus_sampling = true      # sample Weaviate RSS during load/index only, never during search
+sample_interval_s = 0.5
+
+[check]
+samples = 10
+seed = 42
+
+[run]
+group = "weaviate"              # value of the `group` column in build.csv / search.csv
+system = "weaviate"

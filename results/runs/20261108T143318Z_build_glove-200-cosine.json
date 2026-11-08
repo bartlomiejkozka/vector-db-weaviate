@@ -1,0 +1,283 @@
+{
+  "row": {
+    "group": "weaviate",
+    "system": "weaviate",
+    "version": "1.40.1",
+    "dataset": "glove-200-cosine",
+    "ingest_s": 68.817,
+    "build_s": 858.565,
+    "index_mb": 259.1,
+    "db_mb": 2171.3,
+    "peak_mem_mb": 6796.5,
+    "cpu": "aarch64",
+    "cores": 4,
+    "ram_gb": 8.0,
+    "date": "2026-11-08",
+    "kmeans_s": null
+  },
+  "system": {
+    "cpu": "aarch64",
+    "cores": 4,
+    "cpuset": "0-3",
+    "ram_gb": 8.0,
+    "host_ram_gb": "",
+    "host_os": "Linux-7.0.14-linuxkit-aarch64-with-glibc2.36",
+    "disk": "SSD",
+    "container": {
+      "cpuset": "0-3",
+      "memory_bytes": 8589934592,
+      "memory_swap_bytes": 8589934592,
+      "image": "cr.weaviate.io/semitechnologies/weaviate:1.40.1",
+      "oom_killed": false
+    },
+    "python": "3.12.12",
+    "libraries": {
+      "weaviate-client": "4.23.1",
+      "h5py": "3.16.0",
+      "numpy": "2.5.4",
+      "docker": "7.1.0",
+      "requests": "2.34.2"
+    }
+  },
+  "config": {
+    "dataset": "glove-200-cosine",
+    "profile": "small",
+    "profile_reason": "auto: rule #1 (max_raw_gb=1.5) matched raw=0.95 GB, dim=200",
+    "index": {
+      "index": "hnsw",
+      "distance": "auto",
+      "quantizer": "none",
+      "vector_cache_max_objects": 1000000000000,
+      "max_connections": 48,
+      "ef_construction": 256,
+      "ef": -1,
+      "dynamic_ef_min": 100,
+      "dynamic_ef_max": 500,
+      "dynamic_ef_factor": 8,
+      "flat_search_cutoff": 40000,
+      "cleanup_interval_seconds": 300,
+      "rq_bits": 8,
+      "rescore_limit": -1,
+      "pq_segments": 0,
+      "pq_centroids": 256,
+      "training_limit": 100000,
+      "max_posting_size_kb": 48,
+      "replicas": 4,
+      "search_probe": 256,
+      "sweep_param": "ef",
+      "sweep_values": [
+        16,
+        24,
+        32,
+        48,
+        64,
+        96,
+        128,
+        192,
+        256,
+        384,
+        512
+      ]
+    },
+    "sections": {
+      "estimator": {
+        "mode": "detailed",
+        "memory_limit_gb": 8.0,
+        "simple_factor": 1.5,
+        "bytes_per_link": 10,
+        "overhead_factor": 1.25,
+        "budget_fraction": 0.85
+      },
+      "oversize": {
+        "policy": "reject",
+        "fallback": "hnsw_rq8"
+      },
+      "schema": {
+        "store_row_id": true,
+        "vector_name": "vector"
+      },
+      "ingest": {
+        "mode": "client_fixed",
+        "read_chunk": 50000,
+        "batch_size": 1000,
+        "concurrent_requests": 2,
+        "stream_concurrency": 1,
+        "max_errors": 0
+      },
+      "timing": {
+        "mode": "auto",
+        "poll_interval_s": 1.0,
+        "index_timeout_s": 0
+      },
+      "metrics": {
+        "memory_source": "cgroup",
+        "restart_before_load": true,
+        "prometheus_sampling": true,
+        "sample_interval_s": 0.5
+      },
+      "check": {
+        "samples": 10,
+        "seed": 42
+      },
+      "run": {
+        "group": "weaviate",
+        "system": "weaviate"
+      }
+    },
+    "layers": [
+      {
+        "source": "defaults",
+        "values": {
+          "index": "hnsw",
+          "distance": "auto",
+          "quantizer": "none",
+          "vector_cache_max_objects": 1000000000000,
+          "max_connections": 32,
+          "ef_construction": 128,
+          "ef": -1,
+          "dynamic_ef_min": 100,
+          "dynamic_ef_max": 500,
+          "dynamic_ef_factor": 8,
+          "flat_search_cutoff": 40000,
+          "cleanup_interval_seconds": 300,
+          "rq_bits": 8,
+          "rescore_limit": -1,
+          "pq_segments": 0,
+          "pq_centroids": 256,
+          "training_limit": 100000,
+          "max_posting_size_kb": 48,
+          "replicas": 4,
+          "search_probe": 256,
+          "sweep_param": "ef",
+          "sweep_values": [
+            16,
+            24,
+            32,
+            48,
+            64,
+            96,
+            128,
+            192,
+            256,
+            384,
+            512
+          ]
+        }
+      },
+      {
+        "source": "profiles.small",
+        "values": {
+          "max_connections": 48,
+          "ef_construction": 256
+        }
+      }
+    ],
+    "estimate": {
+      "mode": "detailed",
+      "fits": true,
+      "formula": "(vectors 0.95 GB + graph 1.14 GB) x 1.25",
+      "raw_mb": 954.0,
+      "vector_mb": 954.0,
+      "graph_mb": 1144.8,
+      "total_mb": 2623.5,
+      "budget_mb": 6800.0
+    },
+    "notes": []
+  },
+  "schema": {
+    "definition": {
+      "collection": "Glove_200_cosine",
+      "baseline_table": "glove_200_cosine",
+      "columns": [
+        {
+          "column": "id",
+          "weaviate": "object UUID = UUID(int=row)",
+          "type": "64-bit integer (encoded)"
+        },
+        {
+          "column": "id",
+          "weaviate": "property row_id",
+          "type": "INT (int64)"
+        },
+        {
+          "column": "vector",
+          "weaviate": "named vector 'vector'",
+          "type": "float32[200]"
+        }
+      ],
+      "shards": 1,
+      "replication_factor": 1
+    },
+    "index": {
+      "type": "hnsw",
+      "distance": "cosine",
+      "max_connections": 48,
+      "ef_construction": 256,
+      "ef": -1,
+      "dynamic_ef_min": 100,
+      "dynamic_ef_max": 500,
+      "dynamic_ef_factor": 8,
+      "flat_search_cutoff": 40000,
+      "vector_cache_max_objects": 1000000000000,
+      "cleanup_interval_seconds": 300,
+      "quantizer": "none"
+    },
+    "timing_mode": "async",
+    "server_version": "1.40.1",
+    "server_env": {
+      "AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED": "true",
+      "LOG_LEVEL": "warning",
+      "PERSISTENCE_HNSW_MAX_LOG_SIZE": "1GiB",
+      "ASYNC_INDEXING": "true",
+      "CLUSTER_HOSTNAME": "node1",
+      "ENABLE_MODULES": "",
+      "PERSISTENCE_DATA_PATH": "/db",
+      "GOMAXPROCS": "4",
+      "DEFAULT_QUANTIZATION": "none",
+      "DISABLE_TELEMETRY": "true",
+      "PROMETHEUS_MONITORING_ENABLED": "true",
+      "LIMIT_RESOURCES": "false",
+      "QUERY_DEFAULTS_LIMIT": "10",
+      "DEFAULT_VECTORIZER_MODULE": "none",
+      "QUERY_MAXIMUM_RESULTS": "10000",
+      "AUTOSCHEMA_ENABLED": "false",
+      "GOMEMLIMIT": "6800MiB",
+      "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    }
+  },
+  "load": {
+    "load_s": 68.817,
+    "rows": 1192514,
+    "failed": 0,
+    "mode": "client_fixed",
+    "peak_mem_mb": 5121.3,
+    "rss_peak_mb": 1949.9
+  },
+  "index": {
+    "ingest_s": 68.817,
+    "build_s": 858.565,
+    "timing_mode": "async",
+    "wait_s": 858.565,
+    "peak_mem_mb": 6796.5,
+    "rss_peak_mb": 4476.4,
+    "index_mb": 259.1,
+    "db_mb": 2171.3
+  },
+  "check": {
+    "count": 1192514,
+    "expected": 1192514,
+    "sampled_ids": [
+      102491,
+      106432,
+      112307,
+      240255,
+      516374,
+      523366,
+      780581,
+      831619,
+      922947,
+      1023886
+    ],
+    "problems": []
+  }
+}

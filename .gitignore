@@ -6,8 +6,8 @@ db-data/
 results/runs/*.state.json
 
 __pycache__/
+.vscode/
 *.pyc
 .env
 .venv/
-*.pdf
 .DS_Store

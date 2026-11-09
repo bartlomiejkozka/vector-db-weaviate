@@ -1,2 +1,3 @@
 group,system,version,dataset,ingest_s,build_s,index_mb,db_mb,peak_mem_mb,cpu,cores,ram_gb,date,kmeans_s
 weaviate,weaviate,1.40.1,glove-200-cosine,68.817,858.565,259.1,2171.3,6796.5,aarch64,4,8.0,2026-11-08,
+weaviate,weaviate,1.40.1,glove-200-cosine,64.823,854.963,265.1,1707.8,8309.9,aarch64,4,8.0,2026-11-08,
